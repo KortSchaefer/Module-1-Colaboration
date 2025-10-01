@@ -1,8 +1,13 @@
-from django.contrib import admin
+﻿from django.contrib import admin
 
-# Register your models here.
+from .models import Post, Server
 
-from django.contrib import admin
-from .models import Post
+
+@admin.register(Server)
+class ServerAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "sectionAssigned", "timeIn", "hoursScheduled")
+    search_fields = ("id", "name", "sectionAssigned")
+    ordering = ("name",)
+
 
 admin.site.register(Post)

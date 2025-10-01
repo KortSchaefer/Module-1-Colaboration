@@ -1,254 +1,159 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Drag & Drop: Django Objects → Grid</title>
+  <title>Simple Drag & Drop Grid</title>
   <style>
-    :root { --bg:#0b0b0c; --panel:#141417; --muted:#8b8b94; --accent:#4f8cff; --grid:#1e1e23; --cell:#18181c; --ok:#36c169; --warn:#ffcc00; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:#e8e8ee; }
-    header { padding:14px 18px; border-bottom:1px solid #202025; background:linear-gradient(180deg, #121217, #0b0b0c); position:sticky; top:0; z-index:5; }
-    header h1 { margin:0; font-size:16px; letter-spacing:.2px; font-weight:600; }
-    header small { color:var(--muted); }
-    .wrap { display:grid; grid-template-columns: 280px 1fr; gap:12px; padding:14px; }
-
-    /* Left: palette */
-    .palette { background:var(--panel); border:1px solid #22222a; border-radius:12px; padding:12px; min-height:60vh; display:flex; flex-direction:column; }
-    .palette h2 { font-size:13px; margin:2px 0 10px; color:var(--muted); font-weight:600; }
-    .items { display:flex; flex-direction:column; gap:8px; }
-    .item { border:1px solid #2a2a33; background: #16161a; border-radius:10px; padding:10px 12px; cursor:grab; user-select:none; box-shadow: 0 1px 0 #000; }
-    .item:active { cursor:grabbing; }
-    .item small { color:var(--muted); display:block; margin-top:2px; }
-
-    /* Right: grid */
-    .sheet { background:var(--panel); border:1px solid #22222a; border-radius:12px; padding:12px; }
-    .toolbar { display:flex; gap:8px; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .btn { border:1px solid #2a2a33; background:#101013; border-radius:10px; padding:8px 10px; color:#e8e8ee; cursor:pointer; font-size:13px; }
-    .btn:hover { border-color:#3a3a44; }
-    .hint { color:var(--muted); font-size:12px; }
-
-    .grid { width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed; overflow:hidden; border-radius:10px; }
-    .grid thead th { position:sticky; top:0; z-index:2; background:#111117; font-size:12px; color:var(--muted); border-bottom:1px solid #26262e; padding:8px; }
-    .grid tbody td { border-right:1px solid #23232b; border-bottom:1px solid #23232b; height:58px; background:var(--cell); vertical-align:middle; }
-    .grid tbody tr td:first-child, .grid thead th:first-child { position:sticky; left:0; z-index:1; background:#111117; }
-    .cell-inner { height:100%; display:flex; align-items:center; justify-content:center; padding:6px; }
-
-    /* Drop states */
-    .droptarget { outline:2px dashed #3a3a44; outline-offset:-3px; }
-    .occupied { background:#151519; }
-
-    /* Trash */
-    .trash { margin-top:auto; padding:10px; border:1px dashed #34343f; border-radius:10px; color:var(--muted); text-align:center; }
-    .trash.dragover { border-color:#a05555; color:#ffb3b3; background:#211618; }
-
-    /* Responsive */
-    @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+    *{box-sizing:border-box;font-family:system-ui,Arial,sans-serif}
+    body{margin:0;display:grid;grid-template-columns:260px 1fr;gap:12px;padding:12px;background:#111;color:#eee}
+    .palette,.sheet{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:10px}
+    h2{margin:0 0 8px;font-size:14px;color:#bbb}
+    .item{padding:8px 10px;margin:6px 0;border:1px solid #313131;border-radius:8px;background:#191919;cursor:grab}
+    .grid{width:100%;border-collapse:collapse;table-layout:fixed}
+    .grid th,.grid td{border:1px solid #2a2a2a;padding:6px}
+    .grid thead th{background:#161616;color:#bbb}
+    .grid tbody th{background:#161616;color:#bbb;width:140px}
+    .cell{height:44px;display:flex;align-items:center;justify-content:center}
+    .empty-state{color:#777;font-size:13px;padding:4px 0}
   </style>
 </head>
 <body>
-  <header>
-    <h1>Drag & Drop → Simple Grid <small>Vanilla HTML + JS (no libs)</small></h1>
-  </header>
+  <!-- LEFT: simple list of draggable "Django" objects -->
+  <section class="palette" id="palette">
+    <h2>Servers</h2>
+    {% for server in servers %}
+      <div
+        class="item"
+        draggable="true"
+        data-id="{{ server.id }}"
+        data-label="{{ server.name }}"
+        data-upsell-score="{{ server.upsellScore }}"
+        data-section-assigned="{{ server.sectionAssigned }}"
+        data-time-in="{{ server.timeIn|date:'c' }}"
+        data-hours-scheduled="{{ server.hoursScheduled }}"
+        data-length-of-employment="{{ server.length_of_employment }}"
+        data-max-guests="{{ server.max_guests }}"
+        data-pyos="{{ server.pyos }}"
+        data-pitty="{{ server.pitty }}"
+      >{{ server.name }}</div>
+    {% empty %}
+      <p class="empty-state">No servers available. Add some in the admin.</p>
+    {% endfor %}
+  </section>
 
-  <main class="wrap">
-    <!-- LEFT: Django objects (palette). Replace the example items with your Django objects via a template loop. -->
-    <section class="palette" id="palette" aria-label="Django Objects Palette">
-      <h2>Objects</h2>
-      <div class="items" id="items">
-        <!-- Example items. In Django, render like:
-        {% for obj in objects %}
-          <div class="item" draggable="true" data-id="{{ obj.id }}" data-label="{{ obj }}">
-            <strong>{{ obj }}</strong>
-            <small>ID: {{ obj.id }}</small>
-          </div>
-        {% endfor %}
-        -->
-        <div class="item" draggable="true" data-id="101" data-label="Alice Johnson"><strong>Alice Johnson</strong><small>ID: 101</small></div>
-        <div class="item" draggable="true" data-id="102" data-label="Bob Smith"><strong>Bob Smith</strong><small>ID: 102</small></div>
-        <div class="item" draggable="true" data-id="103" data-label="Charlie Chen"><strong>Charlie Chen</strong><small>ID: 103</small></div>
-        <div class="item" draggable="true" data-id="104" data-label="Diana Patel"><strong>Diana Patel</strong><small>ID: 104</small></div>
-      </div>
-
-      <div class="trash" id="trash" aria-label="Remove from grid">Drop here to remove from grid</div>
-    </section>
-
-    <!-- RIGHT: Spreadsheet-like grid -->
-    <section class="sheet" aria-label="Grid Sheet">
-      <div class="toolbar">
-        <div class="hint">Tip: drag an object into any cell. Each cell holds at most one object.</div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn" id="clearGrid">Clear Grid</button>
-          <button class="btn" id="exportBtn">Export JSON</button>
-        </div>
-      </div>
-
-      <table class="grid" id="grid" role="grid" aria-label="Placement Grid">
-        <thead>
-          <tr>
-            <th></th>
-            <th>A</th>
-            <th>B</th>
-            <th>C</th>
-            <th>D</th>
-            <th>E</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Build 5x5 body with row labels 1..5 -->
-          <!-- You can change rows/cols by editing the loops in JS or manually duplicating rows. -->
-          <script>
-            // Build rows dynamically so the HTML stays tiny
-            (function buildGrid(){
-              const tbody = document.currentScript.parentElement;
-              const rows = 5, cols = 5;
-              for (let r=1; r<=rows; r++) {
-                const tr = document.createElement('tr');
-                // Row header
-                const th = document.createElement('th');
-                th.textContent = r;
-                tr.appendChild(th);
-                for (let c=0; c<cols; c++) {
-                  const td = document.createElement('td');
-                  td.dataset.row = r;
-                  td.dataset.col = String.fromCharCode(65 + c); // A,B,C,
-                  const inner = document.createElement('div');
-                  inner.className = 'cell-inner';
-                  inner.setAttribute('draggable','false');
-                  td.appendChild(inner);
-                  tr.appendChild(td);
-                }
-                tbody.appendChild(tr);
-              }
-            })();
-          </script>
-        </tbody>
-      </table>
-    </section>
-  </main>
+  <!-- RIGHT: minimal spreadsheet-like table -->
+  <section class="sheet">
+    <h2>Sections Grid</h2>
+    <table class="grid" id="grid">
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Server</th>
+          <th>Sidework</th>
+          <th>Outwork</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </section>
 
   <script>
-    // --- Minimal Drag & Drop logic (vanilla) ---
-    const items = document.getElementById('items');
-    const palette = document.getElementById('palette');
-    const grid = document.getElementById('grid');
-    const trash = document.getElementById('trash');
+    // --- Minimal config data ---
+    const sections = [
+      "15,22,23","14,13,112","11,12,21","114,123,134","113,133,124",
+      "121,122,111","411,412,413","131,132,211","414,415,212","213,214,234",
+      "215,216,334","221,222,231","233,232,223","224,235,236","237,226,225",
+      "312,322,332","416,417,418","311,321,331","313,323,333","302,303,304",
+      "314,325,335","315,324,336"
+    ];
 
-    function onDragStart(e) {
-      const item = e.target.closest('.item');
-      if (!item) return;
-      e.dataTransfer.setData('text/plain', JSON.stringify({ id: item.dataset.id, label: item.dataset.label }));
-      e.dataTransfer.effectAllowed = 'move';
-      // mark source
-      item.classList.add('dragging');
-    }
+    const sidework = [
+      "Sweep section","Sanitize caddies","Restock ramekins","Restock napkins",
+      "Polish glasses","Restock straws","Restock dressings","Refill butter",
+      "Restock ranch","Honey-cin butter","Restock plates","Clean POS",
+      "Salt/Pepper check","Ketchup check","Mustard check","Sweep server alley",
+      "Clean soda heads","Restock lids","Wipe menus","Restock to-go bags",
+      "Kids crayons","Restock baskets"
+    ];
 
-    function onDragEnd(e){
-      const item = e.target.closest('.item');
-      if (item) item.classList.remove('dragging');
-    }
+    const outwork = [
+  "Closing Sidework", "Right side hot well", "Cold Well Wipe Down",
+  "Soda Station 1 & Syrup Pumps, Sweep Bar/Spot Sweep", "Cold Well Flips", "Tea 1",
+  "Front Check", "Sweep Bar Area", "Large trays and wipe down alley walls",
+  "Left side hotwell", "Soda Station 2 and bread plates", "Stock ALL To-go Supplies, Tea, & Coffee",
+  "Tea 2 and breadplates", "Stock Expo Pars / Clean Lemon Cutter", "Sweep and detail FOH pass",
+  "Small Trays", "Bread plates. All Countertops, bottom shelves", "Back Checker",
+  "Marry condiments", "Box Tops Tray Jacks detailed, MIRROR", "Coffee & Thorough Alley Sweep",
+  "Employee drinks, alley hand sink, alley POS", "Clean Sugar Bin, Make 20 BAGS of sugar, Sauce organized"
+];
 
-    // Allow drop on grid cells & trash & palette
-    function allowDrop(e){ e.preventDefault(); }
 
-    function cellFromEvent(e){
-      const td = e.target.closest('td');
-      return td;
-    }
 
-    function highlightCell(e){
-      const td = cellFromEvent(e);
-      if (!td) return;
-      td.classList.add('droptarget');
-    }
-    function unhighlightCell(e){
-      const td = cellFromEvent(e);
-      if (!td) return;
-      td.classList.remove('droptarget');
-    }
+    // Build table rows
+    const tbody = document.getElementById('tbody');
+    sections.forEach((label, i)=>{
+      const tr = document.createElement('tr');
+      const th = document.createElement('th'); th.textContent = label; tr.appendChild(th);
 
-    function dropOnCell(e){
-      e.preventDefault();
-      const td = cellFromEvent(e);
-      if (!td) return;
-      td.classList.remove('droptarget');
+      // Column A: Server (droppable)
+      const tdA = document.createElement('td'); tdA.dataset.col = 'A'; tdA.innerHTML = '<div class="cell"></div>'; tr.appendChild(tdA);
+      // Column B: Sidework (static text)
+      const tdB = document.createElement('td'); tdB.dataset.col = 'B'; tdB.innerHTML = `<div class="cell">${sidework[i]||''}</div>`; tr.appendChild(tdB);
+      // Column C: Outwork (static text)
+      const tdC = document.createElement('td'); tdC.dataset.col = 'C'; tdC.innerHTML = `<div class="cell">${outwork[i]||''}</div>`; tr.appendChild(tdC);
 
-      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-      if (!data) return;
-
-      // Ensure only one item per cell
-      const inner = td.querySelector('.cell-inner');
-      if (!inner) return;
-
-      // If there was an existing item in this cell, return it to the palette
-      const existing = inner.querySelector('.item');
-      if (existing) items.appendChild(existing);
-
-      // Find the dragged element (it might be in palette OR in another cell)
-      const dragged = document.querySelector(`.item.dragging`) || Array.from(document.querySelectorAll('.item')).find(i => i.dataset.id === data.id);
-      if (!dragged) return;
-
-      // Place in this cell
-      inner.appendChild(dragged);
-      td.classList.add('occupied');
-    }
-
-    function dropOnPalette(e){
-      e.preventDefault();
-      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-      if (!data) return;
-      const dragged = document.querySelector(`.item.dragging`) || Array.from(document.querySelectorAll('.item')).find(i => i.dataset.id === data.id);
-      if (!dragged) return;
-      items.appendChild(dragged);
-    }
-
-    function dropOnTrash(e){
-      e.preventDefault();
-      trash.classList.remove('dragover');
-      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-      if (!data) return;
-      const dragged = document.querySelector(`.item.dragging`) || Array.from(document.querySelectorAll('.item')).find(i => i.dataset.id === data.id);
-      if (!dragged) return;
-      // Remove from grid and return to palette (soft delete from cell)
-      items.appendChild(dragged);
-    }
-
-    // Events for items
-    palette.addEventListener('dragstart', onDragStart);
-    palette.addEventListener('dragend', onDragEnd);
-
-    // Grid events (delegate)
-    grid.addEventListener('dragover', (e)=>{ if (cellFromEvent(e)) { allowDrop(e); highlightCell(e);} });
-    grid.addEventListener('dragleave', unhighlightCell);
-    grid.addEventListener('drop', dropOnCell);
-
-    // Palette drop (to move items back)
-    palette.addEventListener('dragover', allowDrop);
-    palette.addEventListener('drop', dropOnPalette);
-
-    // Trash
-    trash.addEventListener('dragover', (e)=>{ allowDrop(e); trash.classList.add('dragover'); });
-    trash.addEventListener('dragleave', ()=> trash.classList.remove('dragover'));
-    trash.addEventListener('drop', dropOnTrash);
-
-    // Utilities
-    document.getElementById('clearGrid').addEventListener('click', ()=>{
-      document.querySelectorAll('#grid td .item').forEach(el=> items.appendChild(el));
-      document.querySelectorAll('#grid td').forEach(td=> td.classList.remove('occupied','droptarget'));
+      tbody.appendChild(tr);
     });
 
-    document.getElementById('exportBtn').addEventListener('click', ()=>{
-      const placements = [];
-      document.querySelectorAll('#grid tbody td').forEach(td=>{
-        const itm = td.querySelector('.item');
-        if (itm) placements.push({ id: itm.dataset.id, label: itm.dataset.label, row: td.dataset.row, col: td.dataset.col });
-      });
-      const json = JSON.stringify({ placements }, null, 2);
-      // Display quickly
-      const w = window.open('', '_blank');
-      w.document.write('<pre style="margin:0;padding:16px;background:#0b0b0c;color:#e8e8ee;">'+json.replace(/[&<>]/g, s=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[s]))+'</pre>');
-      w.document.close();
+    // --- Minimal drag & drop logic ---
+    const palette = document.getElementById('palette');
+    let draggedId = null;
+
+    // Start drag from a server item
+    palette.addEventListener('dragstart', (e)=>{
+      const it = e.target.closest('.item');
+      if(!it) return;
+      draggedId = it.dataset.id;
+      e.dataTransfer.setData('text/plain', it.dataset.id);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    // Allow drop on Server cells only
+    document.getElementById('grid').addEventListener('dragover', (e)=>{
+      const td = e.target.closest('td');
+      if(td && td.dataset.col === 'A') e.preventDefault();
+    });
+
+    // Drop into Server cell (A). If cell already has a server, move it back to palette.
+    document.getElementById('grid').addEventListener('drop', (e)=>{
+      const td = e.target.closest('td');
+      if(!td || td.dataset.col !== 'A') return;
+      e.preventDefault();
+      const cur = td.querySelector('.cell .item');
+      if (cur) palette.appendChild(cur); // free the cell
+      const source = palette.querySelector(`.item[data-id="${draggedId}"]`) || document.querySelector(`.item[data-id="${draggedId}"]`);
+      if (source) td.querySelector('.cell').appendChild(source);
+      draggedId = null;
+    });
+
+    // Allow moving a placed server back to the palette by dragging it out
+    document.addEventListener('dragstart', (e)=>{
+      const it = e.target.closest('.item');
+      if(!it) return;
+      draggedId = it.dataset.id;
+      e.dataTransfer.setData('text/plain', it.dataset.id);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+
+    palette.addEventListener('dragover', (e)=> e.preventDefault());
+    palette.addEventListener('drop', (e)=>{
+      e.preventDefault();
+      const el = document.querySelector(`.item[data-id="${draggedId}"]`);
+      if (el) palette.appendChild(el);
+      draggedId = null;
     });
   </script>
 </body>
 </html>
+
