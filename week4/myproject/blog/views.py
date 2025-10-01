@@ -1,4 +1,8 @@
-from django.shortcuts import render
+﻿from django.shortcuts import render
+
+from .models import Server
+
 
 def index(request):
-    return render(request, 'blog/base.html')
+    servers = Server.objects.order_by("name")
+    return render(request, 'blog/base.html', {"servers": servers})
